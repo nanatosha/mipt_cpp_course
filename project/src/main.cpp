@@ -30,6 +30,8 @@ int main(int argc, char** argv) {
         return 2;
     }
 
+
+    //проверка файла
     std::ifstream log(argv[1]);
     if (!log) {
         std::print(stderr, "не удалось открыть журнал: {}\n", argv[1]);
@@ -57,7 +59,12 @@ int main(int argc, char** argv) {
     long long lines = 0, comments = 0, events = 0;
     std::map<std::string, long long> event_types_count;
     std::string line;
+    long long total = 0;
+    std::map<std::string, long long> type_counts;
 
+
+
+    //чтение строк файла
     while (std::getline(log, line)) {
         ++lines;
         if (nano_edr::IsBlankOrComment(&line)) {
