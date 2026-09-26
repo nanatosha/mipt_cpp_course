@@ -4,37 +4,46 @@
 
 namespace nano_edr{
 
-bool IsBlankOrComment(const std::string* line){
-    std::size_t k = 0;
-    while (k < line->size() && ((*line)[k] == ' ' || (*line)[k] == '\t')) {
-        k++;
-    }
-
-    if (k == line->size() || (*line)[k] == '#' || (*line)[k] == ';') {
+bool IsBlankOrComment(const std::string* line) {
+    std::size_t k = line->find_first_not_of(" \t");
+    if (k == std::string::npos || (*line)[k] == '#' || (*line)[k] == ';') {
         return true;
     }
     return false;
-    
 }
 
 bool ParseEventLine(const std::string* line, Event* out) {
 
-    if (IsBlankOrComment(line)) return false;
+    if (IsBlankOrComment(line)) {
+        return false;
+    }
 
-    bool has_ts = false, has_type = false, has_pid = false;
+    bool has_ts = false;
+    bool has_type = false;
+    bool has_pid = false;
     const std::string& s = *line;
     std::size_t i = 0;
     
     while (i < s.size()) {
     
-        while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) ++i;
-        if (i >= s.size()) break;
+        while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) {
+            ++i;
+        }
+        if (i >= s.size()) {
+            break;
+        }
 
         std::size_t key_start = i;
-        while (i < s.size() && s[i] != '=' && s[i] != ' ' && s[i] != '\t') ++i;
-        if (i >= s.size() || s[i] != '=') return false;   
+        while (i < s.size() && s[i] != '=' && s[i] != ' ' && s[i] != '\t') {
+            ++i;
+        }
+        if (i >= s.size() || s[i] != '=') {
+            return false;
+        }   
         std::string key = s.substr(key_start, i - key_start);
-        if (key.empty()) return false;                    
+        if (key.empty()) {
+            return false; 
+        }                   
         ++i;                                              
 
         std::string value;
@@ -42,15 +51,23 @@ bool ParseEventLine(const std::string* line, Event* out) {
         if (i < s.size() && s[i] == '"') {
             ++i;
             std::size_t v_start = i;
-            while (i < s.size() && s[i] != '"') ++i;
-            if (i >= s.size()) return false;              
+            while (i < s.size() && s[i] != '"') {
+                ++i;
+            }
+            if (i >= s.size()) {
+                return false; 
+            }             
             value = s.substr(v_start, i - v_start);
             ++i;
-            if (i < s.size() && s[i] != ' ' && s[i] != '\t') return false; 
+            if (i < s.size() && s[i] != ' ' && s[i] != '\t') {
+                return false; 
+            }
         } 
         else {
             std::size_t v_start = i;
-            while (i < s.size() && s[i] != ' ' && s[i] != '\t') ++i;
+            while (i < s.size() && s[i] != ' ' && s[i] != '\t') {
+                ++i;
+            }
             value = s.substr(v_start, i - v_start);
         }
 
