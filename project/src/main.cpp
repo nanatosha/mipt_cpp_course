@@ -1,117 +1,135 @@
-// Каркас агента: читает журнал событий построчно и считает строки.
-//
-// Это заготовка занятия 1.1, а не решение. Детектов она не ищет — их вы
-// добавите здесь же, в отмеченном месте ниже. Формат строки детекта, список
-// признаков и правило про их порядок заданы в постановке занятия: по ним
-// сравниваются эталоны.
-//
-// Весь код лежит в main, и на этом занятии так и надо: функции появятся
-// на занятии 1.2, ссылки — на 1.3. Разбор аргументов, коды возврата и флаг
-// --quiet — часть задания.
-//
-// Запуск:
-//   nano-edr <журнал.log>
-#include <cstdio>
+#include <charconv>
 #include <fstream>
+#include <map>
 #include <print>
 #include <string>
-#include <vector>
-#include <map>
+#include <string_view>
+
+#include "../kit/include/l1.2/event_list.h"
+#include "../kit/include/l1.2/parse.h"
+#include "../kit/include/l1.3/rules.h"
+#include "agent_rules.h"
+
+namespace nano_edr {
+namespace {
+
+struct Options {
+    std::string log_path;
+    bool is_quiet = false;
+    std::size_t window_size = 64;
+};
 
 
-//детекты
-const std::vector<std::string> signatures = {
-        "wscript.exe", ".locked", "certutil.exe", "\\Startup\\"
-    };
+bool ParseArgs(int argc, char** argv, Options* out) {
+    if (argc < 2) {
+        return false;
+    }
+    out->log_path = argv[1];
+    for (int i = 2; i < argc; ++i) {
+        std::string_view a = argv[i];
+        if (a == "--quiet") {
+            out->is_quiet = true;
+        } 
+        else if (a == "--window-size" && i + 1 < argc) {
+            std::string_view s = argv[i + 1];
+            long long n = 0;
+            auto parsed = std::from_chars(s.data(), s.data() + s.size(), n);
+            if (parsed.ec == std::errc()) {
+                out->window_size = static_cast<std::size_t>(n);
+                ++i;
+            }
+        }
+    }
+    return true;
+}
+
+void PrintContext(const EventList& window) {
+    EventNode* last1 = nullptr;
+    EventNode* last2 = nullptr;
+    for (EventNode* n = window.head; n; n = n->next) {
+        last1 = last2;
+        last2 = n;
+    }
+    if (last1) {
+        std::print("[CTX] {}: ts={} type={} pid={}\n", -2, last1->event.ts,
+                   last1->event.type, last1->event.pid);
+    }
+    if (last2) {
+        std::print("[CTX] {}: ts={} type={} pid={}\n", -1, last2->event.ts,
+                   last2->event.type, last2->event.pid);
+    }
+}
+
+void PrintSummary(long long lines, long long comments, long long events, const std::map<std::string, long long>& event_types_count) {
+    std::println("строк {}, из них комментариев {}", lines, comments);
+    std::println("событий всего : {}", events);
+    for (const auto& [type, count] : event_types_count) {
+        std::println("событий типа {} всего : {}", type, count);
+    }
+}
+
+
+void RunLog(const Options& options) {
+    std::ifstream log(options.log_path);
+    if (!log) {
+        throw std::runtime_error("не удалось открыть журнал: " + options.log_path);
+    }
+
+    EventList window{.capacity = options.window_size};
+
+    long long lines = 0;
+    long long comments = 0;
+    long long events = 0;
+    std::map<std::string, long long> event_types_count;
+    std::string line;
+
+    while (std::getline(log, line)) {
+        ++lines;
+        if (IsBlankOrComment(&line)) {
+            if (!line.empty()) {
+                ++comments;
+            }
+            continue;
+        }
+
+        Event ev;
+        if (!ParseEventLine(&line, &ev)) {
+            continue;
+        }
+
+        ++events;
+        ++event_types_count[ev.type];
+
+        size_t detections = CheckRules(ev, AgentRules(), AgentRuleCount());
+
+        if (detections > 0 && !options.is_quiet) {
+            PrintContext(window);
+        }
+
+        ListPushBack(&window, &ev);
+    }
+
+    if (!options.is_quiet) {
+        PrintSummary(lines, comments, events, event_types_count);
+    }
+}
+
+}  
+}  
 
 int main(int argc, char** argv) {
-
-
-    //проверка на аргументы
-    if (argc < 2) {
+    nano_edr::Options options;
+    if (!nano_edr::ParseArgs(argc, argv, &options)) {
         std::print(stderr, "использование: nano-edr <журнал.log>\n");
         return 2;
     }
 
-
-    //проверка файла
-    std::ifstream log(argv[1]);
-    if (!log) {
-        std::print(stderr, "не удалось открыть журнал: {}\n", argv[1]);
-        return 2;
+    try {
+        nano_edr::RunLog(options);
+    } catch (const std::exception& error) {
+        std::print(stderr, "прогон оборван: {}\n", error.what());
+        return 1;
     }
 
-
-    //проверка на квайт
-    bool quiet = false;
-    for (int i = 2; i < argc; ++i) {
-        if (std::string(argv[i]) == "--quiet") {
-        quiet = true;
-        }
-    }
-
-
-
-    //переменные
-    long long lines = 0;
-    long long comments = 0;
-    std::string line;
-    long long total = 0;
-    std::map<std::string, long long> type_counts;
-
-
-
-    //чтение строк файла
-    while (std::getline(log, line)) {
-        
-        ++lines;
-
-
-        size_t k = 0;
-        while (k < line.size() && (line[k] == ' ' || line[k] == '\t')){
-            k++;
-        }
-
-        if (k == line.size() || line[k] == '#' || line[k] == ';'){
-            ++comments;
-            continue;
-        }
-
-
-        total++;
-
-        for (size_t i = 0; i < signatures.size(); ++i) {
-            if (line.find(signatures[i]) != std::string::npos){
-                std::print("[DETECT] строка {}, признак {}: {}\n", lines, signatures[i], line);
-            }
-        }
-
-
-        size_t type_pos = line.find("type=");
-        if (type_pos != std::string::npos){
-            size_t start = type_pos + 5;
-            size_t end = line.find(' ', start);
-            std::string type_val;
-            if (end == std::string::npos) {
-                type_val = line.substr(start);
-            } 
-            else {
-                type_val = line.substr(start, end - start);
-            }
-            type_counts[type_val]++;
-        }
-
-
-    }
-
-    if (!quiet) {
-     std::print("строк {}, из них комментариев {}\n", lines, comments);
-     std::print("всего событий: {}\n", total);
-     std::print("типы событий:\n");
-     for (const auto& [type, count] : type_counts) {
-         std::print("  {}: {}\n", type, count);
-     }
- }
     return 0;
-
 }
