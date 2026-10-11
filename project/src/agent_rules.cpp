@@ -1,17 +1,17 @@
 #include "agent_rules.h"
 
-#include "../kit/include/l1.3/fields.h"
+#include "../kit/include/l2.1/fields.h"
 
 namespace nano_edr {
 
 namespace {
 
 bool IsFileEventType(const Event& event) {
-    return event.type == "file_create" || event.type == "file_write" || event.type == "file_move";
+    return event.type() == "file_create" || event.type() == "file_write" || event.type() == "file_move";
 }
 
 const std::string* FileDestinationPath(const Event& event) {
-    if (event.type == "file_move") {
+    if (event.type() == "file_move") {
         return FindField(event, "to");
     }
     return FindField(event, "path");

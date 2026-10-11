@@ -38,7 +38,7 @@
 #include <cstdint>
 #include <string>
 
-#include "os.h"
+#include <os.h>
 
 namespace nano_edr {
 
