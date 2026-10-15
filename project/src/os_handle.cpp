@@ -12,9 +12,7 @@ OsHandle::OsHandle(const std::string& config_path) {
 }
 
 OsHandle::~OsHandle() {
-  if (handle_) {
-    os_free(handle_);
-  }
+  os_free(handle_);
 }
 
 void OsHandle::Subscribe(os_event_cb callback, void* context) {
@@ -38,9 +36,7 @@ os_status OsHandle::Wait(uint32_t timeout_ms) {
 }
 
 void OsHandle::Stop() {
-  if (handle_) {
-    os_stop(handle_);
-  }
+  os_stop(handle_);
 }
 
 }  // namespace nano_edr

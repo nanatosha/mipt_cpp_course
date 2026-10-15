@@ -20,10 +20,15 @@ class Agent {
 
   static void Trampoline(const os_event* ev, void* ctx) noexcept;
 
+  void ReportDropped() { ++dropped_; } 
+  void ReportBadLine() { ++bad_lines_; }
+
  private:
   EventList window_;
   bool quiet_;
   std::size_t events_ = 0;
+  std::size_t dropped_ = 0;
+  std::size_t bad_lines_ = 0;
   std::map<std::string, std::size_t> event_types_count_;
 };
 

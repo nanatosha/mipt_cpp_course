@@ -43,12 +43,12 @@ bool ParseArgs(int argc, char** argv, Options* out) {
             }
             ++i;
             std::string_view s = argv[i];
-            long long n = 0;
+            std::size_t n = 0;
             auto parsed = std::from_chars(s.data(), s.data() + s.size(), n);
             if (parsed.ec != std::errc() || parsed.ptr != s.data() + s.size()) {
                 return false;
             }
-            out->window_size = static_cast<std::size_t>(n);
+            out->window_size = n;
         } 
         else if (a.starts_with("--")) {
             
