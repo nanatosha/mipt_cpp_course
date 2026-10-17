@@ -1,47 +1,44 @@
-#include "../kit/include/l1.2/event_list.h"
+#include "../kit/include/l2.1/event_list.h"
 
-namespace nano_edr{
+namespace nano_edr {
 
-
-EventList::~EventList(){
-    ListClear(this);
+EventList::~EventList() {
+    Clear();
 }
 
-void ListClear(EventList* list){
-    while (list->head){
-        ListPopFront(list);
+void EventList::PushBack(const Event& event) {
+    if (capacity_ > 0 && size_ >= capacity_) {
+        PopFront();
     }
+    EventNode* current = new EventNode(event);
+
+    if (tail_) {
+        tail_->next = current;
+    } 
+    else {
+        head_ = current;
+    }
+    tail_ = current;
+    ++size_;
 }
 
-void ListPushBack(EventList* list, const Event* event){
-    if (list->capacity > 0 && list->size >= list->capacity){
-        ListPopFront(list);
-    }
-    EventNode* current = new EventNode;
-    current->event = *event;
-    current->next = nullptr;
-
-    if (list->tail){
-        list->tail->next = current;
-    }
-    else{
-        list->head = current;
-    }
-    list->tail = current;
-    ++list->size;
-}
-
-void ListPopFront(EventList* list){
-    if (list->size == 0){
+void EventList::PopFront() {
+    if (size_ == 0) {
         return;
     }
-    EventNode* dead = list->head;
-    list->head = dead->next;
+    EventNode* dead = head_;
+    head_ = dead->next;
     delete dead;
-    --list->size;
-    if (list->size == 0) list->tail = nullptr;
+    --size_;
+    if (size_ == 0) {
+        tail_ = nullptr;
+    }
 }
 
-
+void EventList::Clear() {
+    while (head_) {
+        PopFront();
+    }
+}
 
 }

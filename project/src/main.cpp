@@ -1,135 +1,102 @@
 #include <charconv>
-#include <fstream>
-#include <map>
 #include <print>
 #include <string>
 #include <string_view>
-
-#include "../kit/include/l1.2/event_list.h"
-#include "../kit/include/l1.2/parse.h"
-#include "../kit/include/l1.3/rules.h"
-#include "agent_rules.h"
+#include "agent.h"
+#include "sources.h"
+#include "os_source.h"
 
 namespace nano_edr {
 namespace {
-
 struct Options {
     std::string log_path;
     bool is_quiet = false;
+    bool use_file = false;
     std::size_t window_size = 64;
 };
-
 
 bool ParseArgs(int argc, char** argv, Options* out) {
     if (argc < 2) {
         return false;
     }
-    out->log_path = argv[1];
-    for (int i = 2; i < argc; ++i) {
+    
+    for (int i = 1; i < argc; ++i) {
         std::string_view a = argv[i];
+        
         if (a == "--quiet") {
             out->is_quiet = true;
         } 
-        else if (a == "--window-size" && i + 1 < argc) {
-            std::string_view s = argv[i + 1];
-            long long n = 0;
+        else if (a == "--file") {
+            out->use_file = true;
+            if (i + 1 >= argc) {
+                return false;  
+            }
+            if (!out->log_path.empty()) {
+                return false;  
+            }
+            ++i;
+            out->log_path = argv[i];
+        }
+        else if (a == "--window-size") {
+            if (i + 1 >= argc) {
+                return false;
+            }
+            ++i;
+            std::string_view s = argv[i];
+            std::size_t n = 0;
             auto parsed = std::from_chars(s.data(), s.data() + s.size(), n);
-            if (parsed.ec == std::errc()) {
-                out->window_size = static_cast<std::size_t>(n);
-                ++i;
+            if (parsed.ec != std::errc() || parsed.ptr != s.data() + s.size()) {
+                return false;
             }
+            out->window_size = n;
+        } 
+        else if (a.starts_with("--")) {
+            
+            return false;
         }
-    }
-    return true;
-}
-
-void PrintContext(const EventList& window) {
-    EventNode* last1 = nullptr;
-    EventNode* last2 = nullptr;
-    for (EventNode* n = window.head; n; n = n->next) {
-        last1 = last2;
-        last2 = n;
-    }
-    if (last1) {
-        std::print("[CTX] {}: ts={} type={} pid={}\n", -2, last1->event.ts,
-                   last1->event.type, last1->event.pid);
-    }
-    if (last2) {
-        std::print("[CTX] {}: ts={} type={} pid={}\n", -1, last2->event.ts,
-                   last2->event.type, last2->event.pid);
-    }
-}
-
-void PrintSummary(long long lines, long long comments, long long events, const std::map<std::string, long long>& event_types_count) {
-    std::println("строк {}, из них комментариев {}", lines, comments);
-    std::println("событий всего : {}", events);
-    for (const auto& [type, count] : event_types_count) {
-        std::println("событий типа {} всего : {}", type, count);
-    }
-}
-
-
-void RunLog(const Options& options) {
-    std::ifstream log(options.log_path);
-    if (!log) {
-        throw std::runtime_error("не удалось открыть журнал: " + options.log_path);
-    }
-
-    EventList window{.capacity = options.window_size};
-
-    long long lines = 0;
-    long long comments = 0;
-    long long events = 0;
-    std::map<std::string, long long> event_types_count;
-    std::string line;
-
-    while (std::getline(log, line)) {
-        ++lines;
-        if (IsBlankOrComment(&line)) {
-            if (!line.empty()) {
-                ++comments;
+        else {
+            
+            if (!out->log_path.empty()) {
+                return false;  
             }
-            continue;
+            out->log_path = std::string(a);
         }
-
-        Event ev;
-        if (!ParseEventLine(&line, &ev)) {
-            continue;
-        }
-
-        ++events;
-        ++event_types_count[ev.type];
-
-        size_t detections = CheckRules(ev, AgentRules(), AgentRuleCount());
-
-        if (detections > 0 && !options.is_quiet) {
-            PrintContext(window);
-        }
-
-        ListPushBack(&window, &ev);
     }
-
-    if (!options.is_quiet) {
-        PrintSummary(lines, comments, events, event_types_count);
-    }
+    
+    return !out->log_path.empty();
 }
 
-}  
-}  
-
-int main(int argc, char** argv) {
-    nano_edr::Options options;
-    if (!nano_edr::ParseArgs(argc, argv, &options)) {
-        std::print(stderr, "использование: nano-edr <журнал.log>\n");
-        return 2;
-    }
-
+int RunLog(const Options& options) {
+    Agent agent(options.window_size, options.is_quiet);
+    
     try {
-        nano_edr::RunLog(options);
+        if (options.use_file) {
+            FileSource source(options.log_path);
+            source.Run(&agent);
+        } else {
+            OsSource source(options.log_path);
+            source.Run(&agent);
+        }
     } catch (const std::exception& error) {
         std::print(stderr, "прогон оборван: {}\n", error.what());
         return 1;
     }
-
+    
+    agent.PrintSummary();
     return 0;
+}
+}  // namespace
+}  // namespace nano_edr
+
+int main(int argc, char** argv) {
+    nano_edr::Options options;
+    
+    if (!nano_edr::ParseArgs(argc, argv, &options)) {
+        std::print(stderr,
+                   "использование: nano-edr [--file] [--quiet] "
+                   "[--window-size N] <журнал>\n");
+        return 2;
+    }
+    
+    return nano_edr::RunLog(options);
 }

@@ -1,4 +1,4 @@
-#include "../kit/include/l1.3/rules.h"
+#include "../kit/include/l2.1/rules.h"
 
 #include <print>
 
@@ -28,7 +28,7 @@ size_t CheckRules(const Event& event, const Rule* rules, size_t rule_count) {
         if (rules[i].check(event)) {
             std::print("[DETECT] {}  {}  ts={} pid={}\n",
                        SeverityName(rules[i].severity), rules[i].id,
-                       event.ts, event.pid);
+                       event.raw_ts(), event.pid());
             ++detections;
         }
     }

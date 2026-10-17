@@ -1,19 +1,16 @@
-#include "../kit/include/l1.2/parse.h"
+#include "parse.h"
 
+namespace nano_edr {
 
-
-namespace nano_edr{
-
-bool IsBlankOrComment(const std::string* line) {
-    std::size_t k = line->find_first_not_of(" \t");
-    if (k == std::string::npos || (*line)[k] == '#' || (*line)[k] == ';') {
+bool IsBlankOrComment(const std::string& line) {
+    std::size_t k = line.find_first_not_of(" \t");
+    if (k == std::string::npos || line[k] == '#' || line[k] == ';') {
         return true;
     }
     return false;
 }
 
-bool ParseEventLine(const std::string* line, Event* out) {
-
+bool ParseEventParts(const std::string& line, EventParts* out) {
     if (IsBlankOrComment(line)) {
         return false;
     }
@@ -21,11 +18,10 @@ bool ParseEventLine(const std::string* line, Event* out) {
     bool has_ts = false;
     bool has_type = false;
     bool has_pid = false;
-    const std::string& s = *line;
+    const std::string& s = line;
     std::size_t i = 0;
-    
+
     while (i < s.size()) {
-    
         while (i < s.size() && (s[i] == ' ' || s[i] == '\t')) {
             ++i;
         }
@@ -39,15 +35,14 @@ bool ParseEventLine(const std::string* line, Event* out) {
         }
         if (i >= s.size() || s[i] != '=') {
             return false;
-        }   
+        }
         std::string key = s.substr(key_start, i - key_start);
         if (key.empty()) {
-            return false; 
-        }                   
-        ++i;                                              
+            return false;
+        }
+        ++i;
 
         std::string value;
-
         if (i < s.size() && s[i] == '"') {
             ++i;
             std::size_t v_start = i;
@@ -55,15 +50,14 @@ bool ParseEventLine(const std::string* line, Event* out) {
                 ++i;
             }
             if (i >= s.size()) {
-                return false; 
-            }             
+                return false;
+            }
             value = s.substr(v_start, i - v_start);
             ++i;
             if (i < s.size() && s[i] != ' ' && s[i] != '\t') {
-                return false; 
+                return false;
             }
-        } 
-        else {
+        } else {
             std::size_t v_start = i;
             while (i < s.size() && s[i] != ' ' && s[i] != '\t') {
                 ++i;
@@ -71,29 +65,21 @@ bool ParseEventLine(const std::string* line, Event* out) {
             value = s.substr(v_start, i - v_start);
         }
 
-
-        if (key == "ts" && !has_ts)   {
-            out->ts = value; 
-            has_ts = true; 
-        }
-        else if (key == "type" && !has_type) { 
-            out->type = value; 
-            has_type = true; 
-        }
-        else if (key == "pid"  && !has_pid)  { 
-            out->pid = value; 
-            has_pid  = true; 
-        }
-        else {
-            Field f;
-            f.key = key;
-            f.value = value;
-            out->fields.push_back(f);
+        if (key == "ts" && !has_ts) {
+            out->ts = value;
+            has_ts = true;
+        } else if (key == "type" && !has_type) {
+            out->type = value;
+            has_type = true;
+        } else if (key == "pid" && !has_pid) {
+            out->pid = value;
+            has_pid = true;
+        } else {
+            out->fields.push_back(Field{key, value});
         }
     }
 
-    return has_ts && has_type;
+    return true;
 }
 
-}
-
+}  // namespace nano_edr
