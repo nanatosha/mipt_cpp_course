@@ -24,6 +24,8 @@ class Agent {
   void ReportBadLine() { ++bad_lines_; }
 
  private:
+  const EventNode* prev1_ = nullptr;
+  const EventNode* prev2_ = nullptr;
   EventList window_;
   bool quiet_;
   std::size_t events_ = 0;

@@ -8,6 +8,22 @@
 
 namespace nano_edr {
 
+namespace{
+  Event Converter(const os_event* ev){
+    EventParts parts;
+    parts.ts = std::to_string(ev->ts);
+    parts.type = ev->type ? ev->type : "";
+    parts.pid = ev->pid == 0 ? std::string{} : std::to_string(ev->pid);
+    parts.fields.reserve(ev->field_count);
+    for (std::size_t i = 0; i < ev->field_count; ++i) {
+      parts.fields.push_back(Field{ev->fields[i].key, ev->fields[i].value});
+    }
+
+    Event event(parts);
+    return event;
+  }
+}
+
 Agent::Agent(std::size_t window_size, bool quiet)
     : window_(window_size), quiet_(quiet) {}
 
@@ -17,20 +33,18 @@ void Agent::HandleEvent(const Event& event) {
     
   
     size_t detections = CheckRules(event, AgentRules(), AgentRuleCount());
+    
+    prev2_ = prev1_;
+    prev1_ = window_.back();
+    
     window_.PushBack(event);
 
     if (detections > 0) {
-        const EventNode* prev = nullptr;
-        const EventNode* current = window_.head();
-        while (current && current->next) {
-            prev = current;
-            current = current->next;
+        if (prev2_) {
+            std::print(stderr, "[CTX] {}\n", prev2_->event);
         }
-        if (prev) {
-            std::print(stderr, "[CTX] {}\n", prev->event);
-        }
-        if (current) {
-            std::print(stderr, "[CTX] {}\n", current->event);
+        if (prev1_) {
+            std::print(stderr, "[CTX] {}\n", prev1_->event);
         }
     }
 }
@@ -48,21 +62,16 @@ void Agent::PrintSummary() const {
 }
 
 void Agent::Trampoline(const os_event* ev, void* ctx) noexcept {
+  Agent* agent = static_cast<Agent*>(ctx);
   try {
-    Agent* agent = static_cast<Agent*>(ctx);
 
-    EventParts parts;
-    parts.ts = std::to_string(ev->ts);
-    parts.type = ev->type ? ev->type : "";
-    parts.pid = ev->pid == 0 ? std::string{} : std::to_string(ev->pid);
-    parts.fields.reserve(ev->field_count);
-    for (std::size_t i = 0; i < ev->field_count; ++i) {
-      parts.fields.push_back(Field{ev->fields[i].key, ev->fields[i].value});
-    }
-
-    Event event(parts);
-    agent->HandleEvent(event);
-  } catch (...) {
+    agent->HandleEvent(Converter(ev));
+  } 
+  catch (const std::exception& error) {
+    agent->ReportDropped();
+  }
+  catch (...) {
+    agent->ReportDropped();
   }
 }
 

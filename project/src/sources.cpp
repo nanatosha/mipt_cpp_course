@@ -38,26 +38,3 @@ void FileSource::Run(Agent* agent) {
     }
 }
 
-// void FileSource::Run(Agent* agent) {
-//     std::ifstream log(path_);
-//     if (!log) {
-//         throw std::runtime_error("не удалось открыть журнал: " + path_);
-//     }
-
-//     std::string line;
-//     while (std::getline(log, line)) {
-//         EventParts parts;
-//         if (!ParseEventParts(line, &parts)) {
-//             continue;
-//         }
-
-//         try {
-//             Event event(parts);
-//             agent->HandleEvent(event);
-//         } catch (const std::exception&) {
-//             continue;
-//         }
-//     }
-// }
-
-// }  // namespace nano_edr
