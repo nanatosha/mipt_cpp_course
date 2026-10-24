@@ -4,29 +4,28 @@
 #include <cstddef>
 #include <map>
 #include <string>
-
-#include "../kit/include/l2.1/event.h"
-#include "../kit/include/l2.1/event_list.h"
-#include "os_handle.h"
+#include <vector>
+#include "../kit/include/l2.2/event.h"
+#include "../kit/include/l2.2/event_list.h"
+#include "../kit/include/l2.2/os_handle.h"
+#include "../kit/include/l2.2/rule.h"
 
 namespace nano_edr {
 
 class Agent {
- public:
+public:
   Agent(std::size_t window_size, bool quiet);
-
   void HandleEvent(const Event& event);
   void PrintSummary() const;
-
   static void Trampoline(const os_event* ev, void* ctx) noexcept;
-
-  void ReportDropped() { ++dropped_; } 
+  void ReportDropped() { ++dropped_; }
   void ReportBadLine() { ++bad_lines_; }
 
- private:
+private:
   const EventNode* prev1_ = nullptr;
   const EventNode* prev2_ = nullptr;
   EventList window_;
+  std::vector<MatchRule> rules_;
   bool quiet_;
   std::size_t events_ = 0;
   std::size_t dropped_ = 0;
@@ -36,4 +35,4 @@ class Agent {
 
 }  // namespace nano_edr
 
-#endif  // NANO_EDR_AGENT_H
+#endif
