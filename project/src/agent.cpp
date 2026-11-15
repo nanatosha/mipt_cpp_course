@@ -1,39 +1,41 @@
 #include "agent.h"
 #include <print>
 #include <string>
-#include "../kit/include/l2.3/rule.h"
+#include "../kit/include/l3.1/rule.h"
 #include "agent_rules.h"
 
 namespace nano_edr {
 
-Agent::Agent(std::size_t window_size, bool quiet)
-    : window_(window_size), engine_(BuildAgentRules()), quiet_(quiet) {}
+Agent::Agent(bool quiet)
+    : engine_(BuildAgentRules()), quiet_(quiet) {}
+
 
 void Agent::HandleEvent(const Event& event) {
     ++events_;
     ++event_types_count_[event.type()];
-    
-    prev2_ = prev1_;
-    prev1_ = window_.back();
-    window_.PushBack(event);
-    
+
     std::vector<const IRule*> fired;
     engine_.ProcessEvent(event, &fired);
-    
-    for (const auto* rule : fired) {
+
+    if (!fired.empty()) {
+        if (!quiet_){
+            if (window_.size() > 1){
+                const WindowEntry& e = window_[window_.size() - 2];
+                std::print("[CTX] -2: {} {} pid={}\n", e.ts.ms, e.type, e.pid);
+            }
+            if (window_.size() > 0){
+                const WindowEntry& e = window_[window_.size() - 1];
+                std::print("[CTX] -1: {} {} pid={}\n", e.ts.ms, e.type, e.pid);
+            }
+        }
+        for (const auto* rule : fired) {
         std::print("[DETECT] {}  {}  ts={} pid={}\n",
                    SeverityName(rule->severity()), rule->id(),
                    event.raw_ts(), event.pid());
     }
-    
-    if (!fired.empty()) {
-        if (prev2_) {
-            std::print(stderr, "[CTX] {}\n", prev2_->event);
-        }
-        if (prev1_) {
-            std::print(stderr, "[CTX] {}\n", prev1_->event);
-        }
     }
+
+    window_.PushBack(WindowEntry{event.ts(), event.type(), event.pid()});
 }
 
 void Agent::PrintSummary() const {
@@ -50,6 +52,7 @@ void Agent::PrintSummary() const {
     for (std::size_t i = 0; i < engine_.size(); ++i) {
         std::println("  {}  {}", engine_.rule(i).id(), engine_.rule(i).hits());
     }
+    std::println("[STAT] в окне {} из {} мест", window_.size(), kWindowCapacity);
 }
 
 }  // namespace nano_edr

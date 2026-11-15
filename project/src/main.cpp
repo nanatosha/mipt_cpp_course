@@ -6,7 +6,7 @@
 #include "agent.h"
 #include "sources.h"
 #include "os_source.h"
-#include "../kit/include/l2.3/event_source.h"
+#include "../kit/include/l3.1/event_source.h"
 
 namespace nano_edr {
 namespace {
@@ -14,7 +14,6 @@ struct Options {
     std::string log_path;
     bool is_quiet = false;
     bool use_file = false;
-    std::size_t window_size = 64;
 };
 
 bool ParseArgs(int argc, char** argv, Options* out) {
@@ -33,15 +32,7 @@ bool ParseArgs(int argc, char** argv, Options* out) {
             ++i;
             out->log_path = argv[i];
         }
-        else if (a == "--window-size") {
-            if (i + 1 >= argc) return false;
-            ++i;
-            std::string_view s = argv[i];
-            std::size_t n = 0;
-            auto parsed = std::from_chars(s.data(), s.data() + s.size(), n);
-            if (parsed.ec != std::errc() || parsed.ptr != s.data() + s.size()) return false;
-            out->window_size = n;
-        }
+        
         else if (a.starts_with("--")) {
             return false;
         }
@@ -54,7 +45,7 @@ bool ParseArgs(int argc, char** argv, Options* out) {
 }
 
 int RunLog(const Options& options) {
-    Agent agent(options.window_size, options.is_quiet);
+    Agent agent(options.is_quiet);
     try {
         std::unique_ptr<IEventSource> source;
         if (options.use_file) {
@@ -78,7 +69,7 @@ int main(int argc, char** argv) {
     if (!nano_edr::ParseArgs(argc, argv, &options)) {
         std::print(stderr,
                    "использование: nano-edr [--file] [--quiet] "
-                   "[--window-size N] <журнал>\n");
+                   "<журнал>\n");
         return 2;
     }
     return nano_edr::RunLog(options);

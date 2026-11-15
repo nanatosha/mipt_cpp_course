@@ -1,6 +1,9 @@
 #include "agent_rules.h"
-#include "../kit/include/l2.3/conditions.h"
-#include "../kit/include/l2.3/rule.h"
+#include "../kit/include/l3.1/conditions.h"
+#include "../kit/include/l3.1/rule.h"
+#include "make_rule.h"
+#include "../kit/include/l3.1/combinators.h"
+
 
 namespace nano_edr {
 
@@ -131,6 +134,25 @@ RuleEngine BuildAgentRules() {
         beacon->AddAction("kill_process");
         engine.AddRule(std::move(beacon));
     }
+    {
+        {
+    auto mass_write = MakeRule<ThresholdRule<128>>(
+        "ransomware_mass_write", Severity::kCritical,
+        20,      // сколько событий
+        10000,   // за сколько миллисекунд
+        "pid");  // считать отдельно для каждого pid
+    mass_write->SetCondition(MakeCondition(AllOfStatic(
+    EventTypeIs({EventType::kFileCreate, EventType::kFileWrite,
+                 EventType::kFileMove}),
+    AnyOfStatic(FieldContains("path", "\\Documents\\"),
+                FieldContains("path", "\\Desktop\\"),
+    FieldContains("to", "\\Documents\\"), FieldContains("to", "\\Desktop\\")))));
+    mass_write->AddAction("kill_process");
+    mass_write->AddAction("quarantine_file");
+    engine.AddRule(std::move(mass_write));
+}
+        
+}
 
     return engine;
 }
