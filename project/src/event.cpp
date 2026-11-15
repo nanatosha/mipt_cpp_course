@@ -1,9 +1,22 @@
-#include "../kit/include/l2.2/event.h"
+#include "../kit/include/l2.3/event.h"
 #include <charconv>
 #include <sstream>
 #include <stdexcept>
 
 namespace nano_edr {
+
+
+EventType EventTypeFromString(const std::string& type) {
+    if (type == "process_start") return EventType::kProcessStart;
+    if (type == "process_end") return EventType::kProcessEnd;
+    if (type == "file_create") return EventType::kFileCreate;
+    if (type == "file_write") return EventType::kFileWrite;
+    if (type == "file_delete") return EventType::kFileDelete;
+    if (type == "file_move") return EventType::kFileMove;
+    if (type == "net_connect") return EventType::kNetConnect;
+    return EventType::kOther;  // неизвестный тип
+}
+
 
 Event::Event(const EventParts& parts) {
   // Проверка ts
@@ -24,6 +37,7 @@ Event::Event(const EventParts& parts) {
   ts_ = Timestamp{ts_value};
   raw_ts_ = parts.ts;
   type_ = parts.type;
+  event_type_ = EventTypeFromString(parts.type);
   pid_ = parts.pid;
   fields_ = parts.fields;
 }
@@ -42,5 +56,6 @@ std::string ToString(const Event& event) {
 std::ostream& operator<<(std::ostream& out, const Event& event) {
   return out << ToString(event);
 }
+
 
 }  // namespace nano_edr
