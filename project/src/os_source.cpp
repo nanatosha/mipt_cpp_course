@@ -1,6 +1,6 @@
 #include "os_source.h"
 #include <stdexcept>
-#include "../kit/include/l2.3/event.h"
+#include "../kit/include/l3.3/event.h"
 
 namespace nano_edr {
 
@@ -18,7 +18,7 @@ void OsSource::Trampoline(const os_event* ev, void* ctx) noexcept {
         for (std::size_t i = 0; i < ev->field_count; ++i) {
             parts.fields.push_back(Field{ev->fields[i].key, ev->fields[i].value});
         }
-        Event event(parts);
+        Event event(std::move(parts));
         handler->HandleEvent(event);
     } catch (...) {
         handler->OnBroken();
@@ -43,5 +43,6 @@ void OsSource::Run(IEventHandler* handler) {
     }
     handle_.Stop();
 }
+
 
 }  // namespace nano_edr
