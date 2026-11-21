@@ -1,7 +1,7 @@
 #include "sources.h"
 #include <fstream>
 #include <stdexcept>
-#include "../kit/include/l3.2/parse.h"
+#include "../kit/include/l3.3/parse.h"
 
 namespace nano_edr {
 
@@ -24,12 +24,14 @@ void FileSource::Run(IEventHandler* handler) {
             continue;
         }
         try {
-            Event event(parts);
+            Event event(std::move(parts));
             handler->HandleEvent(event);
         } catch (const std::exception&) {
             handler->OnBroken();
         }
     }
 }
+
+
 
 }  // namespace nano_edr

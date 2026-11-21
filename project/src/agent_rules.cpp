@@ -1,9 +1,9 @@
 #include "agent_rules.h"
-#include "../kit/include/l3.2/conditions.h"
-#include "../kit/include/l3.2/rule.h"
+#include "../kit/include/l3.3/conditions.h"
+#include "../kit/include/l3.3/rule.h"
 #include "make_rule.h"
-#include "../kit/include/l3.2/combinators.h"
-#include "../kit/include/l3.2/entity_model.h"
+#include "../kit/include/l3.3/combinators.h"
+#include "../kit/include/l3.3/entity_model.h"
 
 
 namespace nano_edr {
@@ -31,6 +31,8 @@ RuleEngine BuildAgentRules(const EntityModel* model){
         rule->AddCondition(std::move(cmdline_cond));
 
         rule->AddAction("kill_process");
+        rule->AddAction("quarantine_source");    
+        rule->AddAction("delete_dropped");     
         engine.AddRule(std::move(rule));
     }
 
@@ -89,7 +91,7 @@ RuleEngine BuildAgentRules(const EntityModel* model){
         path_cond->Add(std::make_unique<FieldContains>("to", "/start menu/programs/startup/"));
         rule->AddCondition(std::move(path_cond));
 
-        rule->AddAction("quarantine_file");
+                rule->AddAction("delete_evidence");     
         engine.AddRule(std::move(rule));
     }
 
@@ -105,7 +107,8 @@ RuleEngine BuildAgentRules(const EntityModel* model){
         path_cond->Add(std::make_unique<FieldEndsWith>("to", ".locked"));
         rule->AddCondition(std::move(path_cond));
 
-        rule->AddAction("quarantine_file");
+        rule->AddAction("kill_process");          
+        rule->AddAction("quarantine_image");      
         engine.AddRule(std::move(rule));
     }
 
@@ -149,7 +152,7 @@ RuleEngine BuildAgentRules(const EntityModel* model){
                 FieldContains("path", "\\Desktop\\"),
     FieldContains("to", "\\Documents\\"), FieldContains("to", "\\Desktop\\")))));
     mass_write->AddAction("kill_process");
-    mass_write->AddAction("quarantine_file");
+    mass_write->AddAction("quarantine_image"); 
     engine.AddRule(std::move(mass_write));
 }
         
@@ -206,7 +209,8 @@ RuleEngine BuildAgentRules(const EntityModel* model){
     });
     
     dropped->AddAction("kill_process");
-    dropped->AddAction("quarantine_file");
+    dropped->AddAction("quarantine_source");      
+    dropped->AddAction("delete_dropped");        
     engine.AddRule(std::move(dropped));
 }
 

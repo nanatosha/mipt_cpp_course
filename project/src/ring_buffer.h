@@ -77,6 +77,15 @@ class RingBuffer {
             head_ = (head_ + 1) % N;
         }
     }
+    void PushBack(T&& value){
+        ring_buffer_[(head_ + size_) % N] = std::move(value);
+        if (size_ < N) {
+            ++size_;
+        } else {
+            head_ = (head_ + 1) % N;
+        }
+    }
+
 
     void Clear(){
         size_ = 0;

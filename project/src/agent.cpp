@@ -1,9 +1,9 @@
 #include "agent.h"
 #include <print>
 #include <string>
-#include "../kit/include/l3.2/rule.h"
+#include "../kit/include/l3.3/rule.h"
 #include "agent_rules.h"
-#include "../kit/include/l3.2/alert_sink.h"
+#include "../kit/include/l3.3/alert_sink.h"
 #include "dedup_sink.h"
 
 namespace nano_edr {
@@ -16,16 +16,23 @@ Agent::Agent(bool quiet, uint64_t dedup_period_ms)
 }
 void Agent::HandleEvent(const Event& event) {
     model_.Observe(event);
+    WindowEntry entry;
+    entry.ts = event.ts();
+    entry.type = event.type();
+    entry.pid = event.pid();
+
+    if (responder_ != nullptr && responder_->Recognize(event)) {
+        window_.PushBack(std::move(entry));
+        return;  // до ProcessEvent своё событие не доходит
+    }
     context_printed_ = false;
     ++events_;
     ++event_types_count_[event.type()];
 
     std::vector<const IRule*> fired;
     engine_.ProcessEvent(event, &fired);
+    window_.PushBack(std::move(entry));
 
-    
-
-    window_.PushBack(WindowEntry{event.ts(), event.type(), event.pid()});
 }
 
 void Agent::PrintSummary() const {
@@ -46,6 +53,16 @@ void Agent::PrintSummary() const {
     std::println("[STAT] в модели процессов {}, файлов {}", model_.process_count(), model_.file_count());
     if (suppressed_ > 0) {
         std::println("[STAT] подавлено дубликатов {} (срок {} мс)", suppressed_, dedup_period_ms_);
+    }
+    if (responder_ != nullptr) {
+        auto stats = responder_->stats();
+        std::println("[STAT] действий запланировано {}, повторов отброшено {}", 
+                     stats.planned, stats.skipped_repeat);
+        std::println("[STAT] завершено процессов {}, изолировано файлов {}, удалено файлов {}", 
+                     stats.killed, stats.quarantined, stats.deleted);
+        if (stats.own_events > 0) {
+            std::println("[STAT] своих событий {}", stats.own_events);
+        }
     }
 
 }
@@ -73,6 +90,15 @@ void Agent::PrintContextOnce() {
             std::print("[CTX] -1: {} {} pid={}\n", e.ts.ms, e.type, e.pid);
         }
     }
+}
+
+void Agent::EnableResponse(OsHandle* os, bool dry_run,
+                           const std::string& quarantine_dir) {
+    planner_ = std::make_unique<ResponsePlanner>(&model_, quarantine_dir);
+    responder_ = std::make_unique<Responder>(os, dry_run);
+    engine_.Subscribe([this](const Detection& detection) {
+        responder_->Execute(planner_->Plan(detection));
+    });
 }
 
 }  // namespace nano_edr

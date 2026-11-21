@@ -6,10 +6,11 @@
 #include "agent.h"
 #include "sources.h"
 #include "os_source.h"
-#include "../kit/include/l3.2/event_source.h"
-#include "../kit/include/l3.2/alert_sink.h"
+#include "../kit/include/l3.3/event_source.h"
+#include "../kit/include/l3.3/alert_sink.h"
 #include "edr_handle.h"
 #include "field_traits.h"
+#include "copy_stats.h"
 
 namespace nano_edr {
 namespace {
@@ -18,6 +19,8 @@ struct Options {
     bool is_quiet = false;
     bool use_file = false;
     std::string out;
+    bool is_copies = false;
+    bool dry_run = false;
 };
 
 bool ParseArgs(int argc, char** argv, Options* out) {
@@ -28,6 +31,12 @@ bool ParseArgs(int argc, char** argv, Options* out) {
         std::string_view a = argv[i];
         if (a == "--quiet") {
             out->is_quiet = true;
+        }
+        else if (a == "--copies") {
+            out->is_copies = true;
+        }
+        else if (a == "--dry-run") {
+            out->dry_run = true;
         }
         else if (a == "--file") {
             out->use_file = true;
@@ -65,7 +74,6 @@ int RunLog(const Options& options) {
             dedup_period_ms = 10000;
         }
 
-        nano_edr::Agent agent(options.is_quiet, dedup_period_ms);
 
 
         std::unique_ptr<IEventSource> source;
@@ -74,20 +82,27 @@ int RunLog(const Options& options) {
         } else {
             source = std::make_unique<OsSource>(options.log_path);
         }
-        nano_edr::FanOutSink targets;
 
+        nano_edr::Agent agent(options.is_quiet, dedup_period_ms);
+
+
+        nano_edr::FanOutSink targets;
         targets.Add(nano_edr::EdrSink(&edr));
         targets.Add(nano_edr::ConsoleSink());
         if (!options.out.empty()) {
             targets.Add(nano_edr::FileSink(options.out));
         }
         agent.Subscribe(std::move(targets));
+        agent.EnableResponse(source->os(), options.dry_run,
+                     edr.Config("quarantine_dir", "C:\\quarantine"));
         source->Run(&agent);
         if (edr.Flush() != EDR_OK) {
             std::print(stderr, "[WARN] детекты не отправлены\n");
-
-        agent.PrintSummary();
         }
+        agent.PrintSummary();
+        if (options.is_copies) {
+    std::println("[COPY] копий всего {}", copy_stats().total());
+}
     } catch (const std::exception& error) {
         std::print(stderr, "прогон оборван: {}\n", error.what());
         return 1;
@@ -101,7 +116,7 @@ int main(int argc, char** argv) {
     nano_edr::Options options;
     if (!nano_edr::ParseArgs(argc, argv, &options)) {
                 std::print(stderr,
-                   "использование: nano-edr [--file] [--quiet] [--out <файл>] "
+                   "использование: nano-edr [--file] [--quiet] [--out <файл>] [--copies] [--dry-run] "
                    "<журнал>\n");
         return 2;
     }

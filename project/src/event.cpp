@@ -1,7 +1,8 @@
-#include "../kit/include/l3.2/event.h"
+#include "../kit/include/l3.3/event.h"
 #include <charconv>
 #include <sstream>
 #include <stdexcept>
+#include "copy_stats.h"
 
 namespace nano_edr {
 
@@ -17,6 +18,7 @@ EventType EventTypeFromString(const std::string& type) {
     return EventType::kOther;  // неизвестный тип
 }
 
+Timestamp Event::Validate(const std::string& raw_ts, const std::string& type) {}
 
 Event::Event(const EventParts& parts) {
   // Проверка ts
@@ -40,6 +42,32 @@ Event::Event(const EventParts& parts) {
   event_type_ = EventTypeFromString(parts.type);
   pid_ = parts.pid;
   fields_ = parts.fields;
+  copy_stats().event_strings_copied += 3 + 2 * parts.fields.size();
+}
+
+Event::Event(EventParts&& parts) {
+  // Проверка ts
+  if (parts.ts.empty()) {
+    throw std::invalid_argument("неверное время события: (пусто)");
+  }
+  uint64_t ts_value = 0;
+  auto result = std::from_chars(parts.ts.data(),
+                                parts.ts.data() + parts.ts.size(),
+                                ts_value);
+  if (result.ec != std::errc() || result.ptr != parts.ts.data() + parts.ts.size()) {
+    throw std::invalid_argument("неверное время события: " + parts.ts);
+  }
+  // Проверка type
+  if (parts.type.empty()) {
+    throw std::invalid_argument("неверный тип события: (пусто)");
+  }
+  ts_ = Timestamp{ts_value};
+  raw_ts_ = std::move(parts.ts);
+  event_type_ = EventTypeFromString(parts.type);
+  type_ = std::move(parts.type);
+  pid_ = std::move(parts.pid);
+  copy_stats().event_strings_moved += 3 + 2 * parts.fields.size();
+  fields_ = std::move(parts.fields);
 }
 
 std::string ToString(const Event& event) {

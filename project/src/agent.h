@@ -4,22 +4,21 @@
 #include <map>
 #include <string>
 #include <vector>
-#include "../kit/include/l3.2/event.h"
-#include "../kit/include/l3.2/event_list.h"
-#include "../kit/include/l3.2/event_source.h"
-#include "../kit/include/l3.2/rule_engine.h"
+#include "../kit/include/l3.3/event.h"
+#include "../kit/include/l3.3/event_list.h"
+#include "../kit/include/l3.3/event_source.h"
+#include "../kit/include/l3.3/rule_engine.h"
 #include "ring_buffer.h"
-#include "../kit/include/l3.2/alert_sink.h"
-   #include "../kit/include/l3.2/entity_model.h"
+#include "../kit/include/l3.3/alert_sink.h"
+   #include "../kit/include/l3.3/entity_model.h"
+
+   #include "window_entry.h"
+#include "response.h"
 
 
 namespace nano_edr {
 
-struct WindowEntry {
-    Timestamp ts;
-    std::string type;
-    std::string pid;
-};
+
 
 class Agent : public IEventHandler {
 public:
@@ -33,7 +32,9 @@ public:
     void PrintSummary() const;
     static constexpr std::size_t kWindowCapacity = 256;
     void Subscribe(AlertSink sink);
-
+    void EnableResponse(OsHandle* os, bool dry_run,
+                    const std::string& quarantine_dir);
+    
 private:
     bool context_printed_ = false;
     RingBuffer<WindowEntry, kWindowCapacity> window_;
@@ -49,6 +50,8 @@ private:
     void PrintContextOnce();
     uint64_t dedup_period_ms_{};
     std::size_t suppressed_{};
+    std::unique_ptr<ResponsePlanner> planner_{};
+    std::unique_ptr<Responder> responder_{};
 };
 }  // namespace nano_edr
 #endif

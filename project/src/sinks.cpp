@@ -3,9 +3,9 @@
 #include <print>
 #include <fstream>
 
-#include "../kit/include/l3.2/alert_sink.h"
+#include "../kit/include/l3.3/alert_sink.h"
 #include "dedup_sink.h"
-#include "../kit/include/l3.2/detection.h"
+#include "../kit/include/l3.3/detection.h"
 
 namespace nano_edr {
 
@@ -33,7 +33,9 @@ void CountingSink::operator()(const Detection& detection) const {
     if (counter_ != nullptr){
         counter_->total++;
     }
-    counter_->seen.push_back(detection);
+    counter_->seen.push_back(SeenAlert{detection.rule, detection.severity,
+                                   detection.ts, detection.pid,
+                                   detection.actions});
 
 }
 // --- FanOutSink ------------------------------------------------------------
